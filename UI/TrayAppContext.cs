@@ -12,6 +12,7 @@ public sealed class TrayAppContext : ApplicationContext
     private readonly ActivityPopup _popup = new();
     private readonly ActivityManager _activity = new();
     private readonly SynchronizationContext _ui;
+    private readonly Icon _appIcon;
 
     private AppSettings _settings;
     private CancellationTokenSource? _feedCts;
@@ -32,6 +33,11 @@ public sealed class TrayAppContext : ApplicationContext
     {
         _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _settings = SettingsStore.Load();
+
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "TGWatch.ico");
+        _appIcon = File.Exists(iconPath)
+            ? new Icon(iconPath)
+            : Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? string.Empty) ?? SystemIcons.Application;
 
         _pauseItem = new ToolStripMenuItem("Pausa monitoraggio")
         {
@@ -80,7 +86,7 @@ public sealed class TrayAppContext : ApplicationContext
         _tray = new NotifyIcon
         {
             Visible = true,
-            Icon = SystemIcons.Information,
+            Icon = _appIcon,
             Text = "TGWatch",
             ContextMenuStrip = menu
         };
@@ -192,7 +198,7 @@ public sealed class TrayAppContext : ApplicationContext
 
     private void ShowSettings()
     {
-        using var form = new SettingsForm(_settings);
+        using var form = new SettingsForm(_settings) { Icon = _appIcon };
         if (form.ShowDialog() != DialogResult.OK)
             return;
 
@@ -249,6 +255,7 @@ public sealed class TrayAppContext : ApplicationContext
         _popup.Close();
         _tray.Visible = false;
         _tray.Dispose();
+        _appIcon.Dispose();
         ExitThread();
     }
 
@@ -260,6 +267,7 @@ public sealed class TrayAppContext : ApplicationContext
             StopFeeds();
             _popup.Dispose();
             _tray.Dispose();
+            _appIcon.Dispose();
         }
 
         base.Dispose(disposing);
