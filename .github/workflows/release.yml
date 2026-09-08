@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish single-file EXE
+        shell: pwsh
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false
+
+      - name: Prepare release assets
+        shell: pwsh
+        run: |
+          $exe = "bin\Release\net8.0-windows\win-x64\publish\TGWatch.exe"
+          if (!(Test-Path $exe)) { throw "TGWatch.exe not found at $exe" }
+          Copy-Item $exe "TGWatch.exe"
+          $hash = (Get-FileHash "TGWatch.exe" -Algorithm SHA256).Hash.ToLower()
+          "$hash  TGWatch.exe" | Set-Content "SHA256SUMS.txt" -Encoding ascii
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release create $tag "TGWatch.exe#TGWatch.exe" "SHA256SUMS.txt#SHA256SUMS.txt" --title "TGWatch for Windows $tag" --notes-file RELEASE_NOTES.md
